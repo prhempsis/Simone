@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Inbox Tracking System</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f0f2f5; color: #1c1e21; padding: 30px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e4e6eb; }
+        h1 { font-size: 24px; color: #050505; display: flex; align-items: center; gap: 10px; }
+        .live-indicator { background: #31a24c; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; text-transform: uppercase; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        #tracker-list { display: flex; flex-direction: column; gap: 12px; }
+        .no-emails { background: white; padding: 40px; text-align: center; border-radius: 8px; border: 1px solid #ced0d4; color: #65676b; font-size: 16px; }
+        .email-row { background: white; border-radius: 8px; border: 1px solid #ced0d4; padding: 20px; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; }
+        .email-row:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .email-info h3 { font-size: 16px; color: #050505; margin-bottom: 4px; }
+        .email-info p { font-size: 13px; color: #65676b; }
+        .status-pill { padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; text-align: center; min-width: 140px; }
+        .status-unread { background-color: #ffebe9; color: #e53e3e; border: 1px solid #fed7d7; }
+        .status-read { background-color: #e6fffa; color: #319795; border: 1px solid #b2f5ea; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>📬 Shared Inbox Live Queue</h1>
+            <div class="live-indicator">● Real-time Live</div>
+        </header>
+
+        <div id="tracker-list">
+            <div class="no-emails">Waiting for target email tracking events to feed through Power Automate...</div>
+        </div>
+    </div>
+
+    <!-- Load Socket.io Client Engine -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const trackerList = document.getElementById('tracker-list');
+
+        socket.on('emailUpdate', (email) => {
+            // Drop placeholder if first item arrives
+            const placeholder = trackerList.querySelector('.no-emails');
+            if (placeholder) placeholder.remove();
+
+            // Try to find if this email row layout already exists on screen
+            let existingRow = document.getElementById(`mail-${email.id}`);
+
+            const labelText = email.isRead ? '✅ Handled' : '⏳ Action Required';
+            const classValue = email.isRead ? 'status-pill status-read' : 'status-pill status-unread';
+            const formattedTime = new Date(email.receivedTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+            if (existingRow) {
+                // If it exists, update its status UI natively without moving its place
+                const pill = existingRow.querySelector('.status-pill');
+                pill.className = classValue;
+                pill.innerText = labelText;
+            } else {
+                // Build a brand new item entry if it's completely new
+                const row = document.createElement('div');
+                row.id = `mail-${email.id}`;
+                row.className = 'email-row';
+                row.innerHTML = `
+                    <div class="email-info">
+                        <h3>${email.subject}</h3>
+                        <p>Sender: ${email.from} | Arrival: ${formattedTime}</p>
+                    </div>
+                    <div class="${classValue}">${labelText}</div>
+                `;
+                // Push new incoming mail straight to top of the dashboard feed
+                trackerList.prepend(row);
+            }
+        });
+    </script>
+</body>
+</html>
